@@ -406,12 +406,11 @@ class SimpleWaterStorage(cp.Component):
         )
 
         # basis here: Q = m * cw * delta temperature, temperature loss is another term for delta temperature here
-        temperature_loss_of_water_in_kelvin = heat_loss_in_watt / (
-            PhysicsConfig.get_properties_for_energy_carrier(
-                energy_carrier=lt.LoadTypes.WATER
-            ).specific_heat_capacity_in_joule_per_kg_per_kelvin
-            * mass_in_storage_in_kg
-        )
+        temperature_loss_of_water_in_kelvin = ( heat_loss_in_watt / (
+                PhysicsConfig.get_properties_for_energy_carrier(
+                    energy_carrier=lt.LoadTypes.WATER
+                ).specific_heat_capacity_in_joule_per_kg_per_kelvin
+                * mass_in_storage_in_kg)) * self.seconds_per_timestep
 
         return heat_loss_in_watt, temperature_loss_of_water_in_kelvin
 
