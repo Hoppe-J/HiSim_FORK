@@ -868,6 +868,7 @@ class PVSystem(cp.Component):
 
         # get modules from pvlib database online
         # (TODO: test if this works, it has not been fully tested yet)
+        print(load_module_data)
         if load_module_data is True:
             if module_database == PVLibModuleAndInverterEnum.SANDIA_MODULE_DATABASE:
                 modules = pvlib.pvsystem.retrieve_sam(name="SandiaMod")
@@ -905,7 +906,7 @@ class PVSystem(cp.Component):
                 module.loc[:, column] = pd.to_numeric(module.loc[:, column], errors="coerce")
 
             # transform module dataframe to dict
-            if len(module) != 1:
+            if len(module) == 0:
                 raise KeyError(
                     f"""No module {module_name} found in database
                     {module_database}."""
