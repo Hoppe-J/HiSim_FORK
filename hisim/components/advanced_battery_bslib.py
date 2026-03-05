@@ -195,7 +195,22 @@ class Battery(Component):
             p_inv_custom=self.custom_pv_inverter_power_generic_in_watt,
             e_bat_custom=self.custom_battery_capacity_generic_in_kilowatt_hour,
         )
+        self.ac_coupled_battery_object._AC2BAT_A_IN = 0.0
+        self.ac_coupled_battery_object._AC2BAT_B_IN = 0.0
+        self.ac_coupled_battery_object._AC2BAT_C_IN = 0.0
+        self.ac_coupled_battery_object._BAT2AC_A_OUT = 0.0
+        self.ac_coupled_battery_object._BAT2AC_B_OUT = 0.0
+        self.ac_coupled_battery_object._BAT2AC_C_OUT = 0.0
 
+        self.ac_coupled_battery_object._P_SYS_SOC0_DC = 0.0
+        self.ac_coupled_battery_object._P_SYS_SOC0_AC = 0.0
+        self.ac_coupled_battery_object._P_SYS_SOC1_DC = 0.0
+        self.ac_coupled_battery_object._P_SYS_SOC1_AC = 0.0
+        self.ac_coupled_battery_object._P_PERI_AC = 0.0
+        self.ac_coupled_battery_object._P_AC2BAT_DEV = 0.0
+        self.ac_coupled_battery_object._P_BAT2AC_DEV = 0.0
+        self.ac_coupled_battery_object._P_AC2BAT_MIN = 0.0
+        self.ac_coupled_battery_object._P_BAT2AC_MIN = 0.0
         # Define component inputs
         self.loading_power_input_channel: ComponentInput = self.add_input(
             object_name=self.component_name,
@@ -277,33 +292,30 @@ class Battery(Component):
             p_load=set_point_for_ac_battery_power_in_watt, soc=state_of_charge, dt=time_increment_in_seconds,
         )
         # The bslib simulation returns how much of loading power input was actually used for charging and discharging and the resulting state of charge
-        ac_battery_power_used_for_charging_or_discharging_in_watt = results[0]
-        dc_battery_power_used_for_charging_or_discharging_in_watt = results[1]
+        dc_terminal_power_in_watt = results[0]
         state_of_charge = results[2]
 
         if state_of_charge < 0 and self.negative_soa_warning:
             log.warning("SOC of Battery cannot be negative. Check your configuration.")
-            self.negative_soa_warning = False  # make sure that the warning comes only once, otherwise too much logging
+            self.negative_soa_warning = False
 
-        # get charging and discharging power
-        if ac_battery_power_used_for_charging_or_discharging_in_watt > 0:
-            charging_power_in_watt = ac_battery_power_used_for_charging_or_discharging_in_watt
+        if dc_terminal_power_in_watt > 0:
+            charging_power_in_watt = dc_terminal_power_in_watt
             discharging_power_in_watt = 0
-        elif ac_battery_power_used_for_charging_or_discharging_in_watt < 0:
+        elif dc_terminal_power_in_watt < 0:
             charging_power_in_watt = 0
-            discharging_power_in_watt = ac_battery_power_used_for_charging_or_discharging_in_watt
+            discharging_power_in_watt = dc_terminal_power_in_watt
         else:
             charging_power_in_watt = 0
             discharging_power_in_watt = 0
 
         # write values for output time series
-        stsv.set_output_value(self.ac_battery_power_channel, ac_battery_power_used_for_charging_or_discharging_in_watt)
-        stsv.set_output_value(self.dc_battery_power_channel, dc_battery_power_used_for_charging_or_discharging_in_watt)
+        stsv.set_output_value(self.ac_battery_power_channel, 0.0)
+        stsv.set_output_value(self.dc_battery_power_channel, dc_terminal_power_in_watt)
         stsv.set_output_value(self.state_of_charge_channel, state_of_charge)
         stsv.set_output_value(self.charing_power_channel, charging_power_in_watt)
         stsv.set_output_value(self.discharging_power_channel, discharging_power_in_watt)
 
-        # write values to state
         self.state.state_of_charge = state_of_charge
 
     def write_to_report(self) -> List[str]:
