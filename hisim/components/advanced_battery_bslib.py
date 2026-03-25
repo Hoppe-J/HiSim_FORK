@@ -58,6 +58,8 @@ class BatteryConfig(ConfigBase):
     system_id: str
     #: charging and discharging power in Watt
     custom_pv_inverter_power_generic_in_watt: float
+    #: inverter efficiency
+    custom_inverter_efficiency: float
     #: battery capacity in in kWh
     custom_battery_capacity_generic_in_kilowatt_hour: float
     #: amount of energy used to charge the car battery
@@ -88,6 +90,7 @@ class BatteryConfig(ConfigBase):
             name=name,
             # https://www.energieinstitut.at/die-richtige-groesse-von-batteriespeichern/
             custom_battery_capacity_generic_in_kilowatt_hour=round(custom_battery_capacity_generic_in_kilowatt_hour, 2),
+            custom_inverter_efficiency=0.96,
             custom_pv_inverter_power_generic_in_watt=round(10 * 0.5 * 1e3, 2),  # c-rate is 0.5C (0.5/h) here
             source_weight=1,
             system_id="SG1",
@@ -117,6 +120,7 @@ class BatteryConfig(ConfigBase):
             name=name,
             # https://www.energieinstitut.at/die-richtige-groesse-von-batteriespeichern/
             custom_battery_capacity_generic_in_kilowatt_hour=round(custom_battery_capacity_generic_in_kilowatt_hour, 2),
+            custom_inverter_efficiency=0.96,
             custom_pv_inverter_power_generic_in_watt=round(custom_battery_capacity_generic_in_kilowatt_hour * c_rate * 1e3, 2),
             source_weight=1,
             system_id="SG1",
@@ -149,6 +153,7 @@ class Battery(Component):
     LoadingPowerInput = "LoadingPowerInput"  # W
 
     # Outputs
+    DcLoadingPowerInput = "DcLoadingPowerInput"
     AcBatteryPowerUsed = "AcBatteryPowerUsed"  # W
     DcBatteryPowerUsed = "DcBatteryPowerUsed"  # W
     StateOfCharge = "StateOfCharge"  # [0..1]
@@ -185,6 +190,8 @@ class Battery(Component):
             self.battery_config.custom_battery_capacity_generic_in_kilowatt_hour
         )
 
+        self.custom_inverter_efficiency = self.battery_config.custom_inverter_efficiency
+
         # Component has states
         self.state = BatteryState()
         self.previous_state = self.state.clone()
@@ -206,6 +213,14 @@ class Battery(Component):
         )
 
         # Define component outputs
+        self.dc_loading_power_channel: ComponentOutput = self.add_output(
+            object_name=self.component_name,
+            field_name=self.DcLoadingPowerInput,
+            load_type=LoadTypes.ELECTRICITY,
+            unit=Units.WATT,
+            output_description=f"here a description for {self.DcLoadingPowerInput} will follow.",
+        )
+
         self.ac_battery_power_channel: ComponentOutput = self.add_output(
             object_name=self.component_name,
             field_name=self.AcBatteryPowerUsed,
@@ -272,6 +287,13 @@ class Battery(Component):
         set_point_for_ac_battery_power_in_watt = stsv.get_input_value(self.loading_power_input_channel)
         state_of_charge = self.state.state_of_charge
 
+        if set_point_for_ac_battery_power_in_watt > 0:
+            dc_set_point = set_point_for_ac_battery_power_in_watt / self.custom_inverter_efficiency
+        elif set_point_for_ac_battery_power_in_watt < 0:
+            dc_set_point = set_point_for_ac_battery_power_in_watt * self.custom_inverter_efficiency
+        else:
+            dc_set_point = 0.0
+
         # Simulate on timestep
         results = self.ac_coupled_battery_object.simulate(
             p_load=set_point_for_ac_battery_power_in_watt, soc=state_of_charge, dt=time_increment_in_seconds,
@@ -297,6 +319,7 @@ class Battery(Component):
             discharging_power_in_watt = 0
 
         # write values for output time series
+        stsv.set_output_value(self.dc_loading_power_channel, dc_set_point)
         stsv.set_output_value(self.ac_battery_power_channel, ac_battery_power_used_for_charging_or_discharging_in_watt)
         stsv.set_output_value(self.dc_battery_power_channel, dc_battery_power_used_for_charging_or_discharging_in_watt)
         stsv.set_output_value(self.state_of_charge_channel, state_of_charge)

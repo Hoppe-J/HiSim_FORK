@@ -68,6 +68,7 @@ class SimpleHotWaterStorageConfig(cp.ConfigBase):
     building_name: str
     name: str
     volume_heating_water_storage_in_liter: float
+    ambient_temperature_in_celsius: float
     heat_transfer_coefficient_in_watt_per_m2_per_kelvin: float
     heat_exchanger_is_present: bool
     position_hot_water_storage_in_system: Union[PositionHotWaterStorageInSystemSetup, int]
@@ -98,6 +99,7 @@ class SimpleHotWaterStorageConfig(cp.ConfigBase):
             building_name=building_name,
             name="SimpleHotWaterStorage",
             volume_heating_water_storage_in_liter=volume_heating_water_storage_in_liter,
+            ambient_temperature_in_celsius=17.0,
             heat_transfer_coefficient_in_watt_per_m2_per_kelvin=2.0,
             heat_exchanger_is_present=True,  # until now stratified mode is causing problems, so heat exchanger mode is recommended
             position_hot_water_storage_in_system=position_hot_water_storage_in_system,
@@ -160,6 +162,7 @@ class SimpleHotWaterStorageConfig(cp.ConfigBase):
             building_name=building_name,
             name=name,
             volume_heating_water_storage_in_liter=round(volume_heating_water_storage_in_liter, 2),
+            ambient_temperature_in_celsius=17.0,
             heat_transfer_coefficient_in_watt_per_m2_per_kelvin=2.0,
             heat_exchanger_is_present=True,  # until now stratified mode is causing problems, so heat exchanger mode is recommended
             position_hot_water_storage_in_system=position_hot_water_storage_in_system,
@@ -211,6 +214,7 @@ class SimpleDHWStorageConfig(cp.ConfigBase):
     building_name: str
     name: str
     volume_heating_water_storage_in_liter: float
+    ambient_temperature_in_celsius: float
     heat_transfer_coefficient_in_watt_per_m2_per_kelvin: float
     #: CO2 footprint of investment in kg
     device_co2_footprint_in_kg: Optional[float]
@@ -235,6 +239,7 @@ class SimpleDHWStorageConfig(cp.ConfigBase):
             building_name=building_name,
             name="DHWStorage",
             volume_heating_water_storage_in_liter=volume_heating_water_storage_in_liter,
+            ambient_temperature_in_celsius=17.0,
             heat_transfer_coefficient_in_watt_per_m2_per_kelvin=0.36,
             # capex and device emissions are calculated in get_cost_capex function by default
             device_co2_footprint_in_kg=None,
@@ -262,6 +267,7 @@ class SimpleDHWStorageConfig(cp.ConfigBase):
             building_name=building_name,
             name=name,
             volume_heating_water_storage_in_liter=volume,
+            ambient_temperature_in_celsius=17.0,
             heat_transfer_coefficient_in_watt_per_m2_per_kelvin=0.36,
             # capex and device emissions are calculated in get_cost_capex function by default
             device_co2_footprint_in_kg=None,
@@ -929,13 +935,13 @@ class SimpleHotWaterStorage(SimpleWaterStorage):
 
         # Water Temperature Limit Check  --------------------------------------------------------------------------------------------------------
 
-        if (
-            self.mean_water_temperature_in_water_storage_in_celsius > 90
-            or self.mean_water_temperature_in_water_storage_in_celsius < 0
-        ):
-            raise ValueError(
-                f"The water temperature in the water storage is with {self.mean_water_temperature_in_water_storage_in_celsius}°C way too high or too low."
-            )
+        # if (
+        #     self.mean_water_temperature_in_water_storage_in_celsius > 90
+        #     or self.mean_water_temperature_in_water_storage_in_celsius < 0
+        # ):
+        #     raise ValueError(
+        #         f"The water temperature in the water storage is with {self.mean_water_temperature_in_water_storage_in_celsius}°C way too high or too low."
+        #     )
 
         # Calculations ------------------------------------------------------------------------------------------------------
 
@@ -1194,7 +1200,7 @@ class SimpleHotWaterStorage(SimpleWaterStorage):
         )
 
         # the ambient temperature is here assumed as the basement temperature which is all year 17°C, this is where the water storage is located
-        self.ambient_temperature_in_celsius = 20.0
+        self.ambient_temperature_in_celsius =  self.waterstorageconfig.ambient_temperature_in_celsius
 
         self.heat_exchanger_is_present = heat_exchanger_is_present
         # if heat exchanger is present, the heat is perfectly exchanged so the water output temperature corresponds to the mean temperature
@@ -1847,7 +1853,7 @@ class SimpleDHWStorage(SimpleWaterStorage):
             storage_volume_in_liter=self.waterstorageconfig.volume_heating_water_storage_in_liter,
         )
 
-        self.ambient_temperature_in_celsius = 20.0
+        self.ambient_temperature_in_celsius = self.waterstorageconfig.ambient_temperature_in_celsius
 
     def i_prepare_simulation(self) -> None:
         """Prepare the simulation."""
@@ -1899,13 +1905,13 @@ class SimpleDHWStorage(SimpleWaterStorage):
 
         # Water Temperature Limit Check  --------------------------------------------------------------------------------------------------------
 
-        if (
-            self.mean_water_temperature_in_water_storage_in_celsius > 90
-            or self.mean_water_temperature_in_water_storage_in_celsius < 0
-        ):
-            raise ValueError(
-                f"The water temperature in the DHW water storage is with {self.mean_water_temperature_in_water_storage_in_celsius}°C way too high or too low."
-            )
+        # if (
+        #     self.mean_water_temperature_in_water_storage_in_celsius > 90
+        #     or self.mean_water_temperature_in_water_storage_in_celsius < 0
+        # ):
+        #     raise ValueError(
+        #         f"The water temperature in the DHW water storage is with {self.mean_water_temperature_in_water_storage_in_celsius}°C way too high or too low."
+        #     )
 
         # if (water_mass_flow_rate_of_dhw_in_kg_per_second > 0) and (self.mean_water_temperature_in_water_storage_in_celsius < self.warm_water_temperature):
         #     # if there is water consumption, the temperature must be high enough

@@ -298,6 +298,7 @@ class PVSystem(cp.Component):
     # Additional output channels must not contain 'ElectricityOutput' or
     # dynamic components will fail.
     ElectricityEnergyOutput = "ElectricityEnergyOutput"
+    DcElectricityOutput = "DcElectricityOutput"
 
     # Similar components to connect to:
     # 1. Weather
@@ -420,6 +421,14 @@ class PVSystem(cp.Component):
                 lt.OutputPostprocessingRules.DISPLAY_IN_WEBTOOL,
             ],
             output_description=f"Here a description for PV {self.ElectricityEnergyOutput} will follow.",
+        )
+
+        self.dc_electricity_output_channel: cp.ComponentOutput = self.add_output(
+            object_name=self.component_name,
+            field_name=self.DcElectricityOutput,
+            load_type=lt.LoadTypes.ELECTRICITY,
+            unit=lt.Units.WATT,
+            output_description=f"Here a description for PV {self.DcElectricityOutput} will follow.",
         )
 
         self.add_default_connections(self.get_default_connections_from_weather())
@@ -598,7 +607,6 @@ class PVSystem(cp.Component):
                 * self.my_simulation_parameters.seconds_per_timestep
                 / 3600,
             )
-
         # calculate pv system outputs with pvlib
         else:
             dni = stsv.get_input_value(self.dni_channel)
@@ -633,7 +641,18 @@ class PVSystem(cp.Component):
                 surface_tilt=self.pvconfig.tilt,
             )
 
+            original_integrate_inverter = self.pvconfig.integrate_inverter
+            self.pvconfig.integrate_inverter = False
+            dc_power_ratio = simulate_fct(
+                dni_extra=dni_extra, dni=dni, dhi=dhi, ghi=ghi,
+                azimuth=azimuth, apparent_zenith=apparent_zenith,
+                temperature=temperature, wind_speed=wind_speed,
+                surface_azimuth=self.pvconfig.azimuth, surface_tilt=self.pvconfig.tilt,
+            )
+            self.pvconfig.integrate_inverter = original_integrate_inverter
+
             ac_power_in_watt = ac_power_ratio * self.pvconfig.power_in_watt
+            dc_power_in_watt = dc_power_ratio * self.pvconfig.power_in_watt
 
             # if you wanted to access the temperature forecast from the
             # weather component:
@@ -646,6 +665,7 @@ class PVSystem(cp.Component):
                 self.electricity_energy_output_channel,
                 ac_power_in_watt * self.my_simulation_parameters.seconds_per_timestep / 3600,
             )
+            stsv.set_output_value(self.dc_electricity_output_channel, dc_power_in_watt)
 
             # cache results at the end of the simulation
             self.ac_power_ratios_for_all_timesteps_data[timestep] = ac_power_ratio
