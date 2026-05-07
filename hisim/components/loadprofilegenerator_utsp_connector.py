@@ -1167,8 +1167,18 @@ class UtspLpgConnector(cp.Component):
                 with open(calcspecfilename, "w", encoding="utf-8") as calcspecfile:
                     jsonrequest = request.to_json(indent=4)
                     calcspecfile.write(jsonrequest)
-                lpe.execute_lpg_binaries()
+                # lpe.execute_lpg_binaries()
 
+                lock_file_path = Path(lpe.calculation_directory).parent / "lpg_execution_global.lock"
+
+                try:
+                    with portalocker.Lock(lock_file_path, timeout=600):
+                        log.information("LPG-Schranke passiert. Starte lokale Profilgenerierung exklusiv...")
+                        lpe.execute_lpg_binaries()
+                        log.information("LPG-Generierung abgeschlossen. Gebe Schranke frei.")
+                except portalocker.exceptions.LockException as e:
+                    log.error(f"Timeout beim Warten auf den LPG: {e}")
+                    raise RuntimeError("Konnte den LPG nicht starten, da die Datenbank dauerhaft blockiert war.")
                 path_to_result_folder = os.path.join(lpe.calculation_directory, request.CalcSpec.OutputDirectory)
 
         return str(path_to_result_folder)
